@@ -97,7 +97,8 @@ static bool dock = false;
 static bool topbar = true;
 static int bw = -1, bh = -1, bx = 0, by = 0;
 static int bu = 1; // Underline height
-static rgba_t fgc, bgc, ugc;
+static int bsize = 0;
+static rgba_t fgc, bgc, bbgc, ugc;
 static rgba_t dfgc, dbgc, dugc;
 static area_stack_t area_stack;
 
@@ -347,7 +348,7 @@ area_t *
 area_get (xcb_window_t win, const int btn, const int x)
 {
     // Looping backwards ensures that we get the innermost area first
-    for (int i = area_stack.at - 1; i >= 0; i--) {
+    for (int i = area_stack.at; i >= 0; i--) {
         area_t *a = &area_stack.area[i];
         if (a->window == win && a->button == btn && x >= a->begin && x < a->end)
             return a;
@@ -792,10 +793,10 @@ monitor_new (int x, int y, int width, int height)
 
     int depth = (visual == scr->root_visual) ? XCB_COPY_FROM_PARENT : 32;
     xcb_create_window(c, depth, ret->window, scr->root,
-            ret->x, ret->y, width, bh, 0,
+            ret->x, ret->y, width, bh, bsize,
             XCB_WINDOW_CLASS_INPUT_OUTPUT, visual,
             XCB_CW_BACK_PIXEL | XCB_CW_BORDER_PIXEL | XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK | XCB_CW_COLORMAP,
-            (const uint32_t []){ bgc.v, bgc.v, dock, XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS, colormap });
+            (const uint32_t []){ bgc.v, bbgc.v, dock, XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS, colormap });
 
     ret->pixmap = xcb_generate_id(c);
     xcb_create_pixmap(c, depth, ret->pixmap, ret->window, width, bh);
@@ -1326,11 +1327,11 @@ main (int argc, char **argv)
     // Connect to the Xserver and initialize scr
     xconn();
 
-    while ((ch = getopt(argc, argv, "hg:bdf:a:pu:B:F:U:n:")) != -1) {
+    while ((ch = getopt(argc, argv, "hg:bdf:a:pu:B:F:R:U:n:r:")) != -1) {
         switch (ch) {
             case 'h':
                 printf ("lemonbar version %s\n", VERSION);
-                printf ("usage: %s [-h | -g | -b | -d | -f | -a | -p | -n | -u | -B | -F]\n"
+                printf ("usage: %s [-h | -g | -b | -d | -f | -a | -p | -n | -u | -B | -F | -R | -r]\n"
                         "\t-h Show this help\n"
                         "\t-g Set the bar geometry {width}x{height}+{xoffset}+{yoffset}\n"
                         "\t-b Put the bar at the bottom of the screen\n"
@@ -1341,7 +1342,9 @@ main (int argc, char **argv)
                         "\t-n Set the WM_NAME atom to the specified value for this bar\n"
                         "\t-u Set the underline/overline height in pixels\n"
                         "\t-B Set background color in #AARRGGBB\n"
-                        "\t-F Set foreground color in #AARRGGBB\n", argv[0]);
+                        "\t-F Set foreground color in #AARRGGBB\n",
+                        "\t-R Set border color in #AARRGGBB\n"
+                        "\t-r Set border size in px\n", argv[0]);
                 exit (EXIT_SUCCESS);
             case 'g': (void)parse_geometry_string(optarg, geom_v); break;
             case 'p': permanent = true; break;
@@ -1353,6 +1356,8 @@ main (int argc, char **argv)
             case 'B': dbgc = bgc = parse_color(optarg, NULL, (rgba_t)0x00000000U); break;
             case 'F': dfgc = fgc = parse_color(optarg, NULL, (rgba_t)0xffffffffU); break;
             case 'U': dugc = ugc = parse_color(optarg, NULL, fgc); break;
+            case 'R': bbgc = parse_color(optarg, NULL, (rgba_t)0x00000000U); break;
+            case 'r': bsize = strtoul(optarg, NULL, 10); break;
             case 'a': areas = strtoul(optarg, NULL, 10); break;
         }
     }
